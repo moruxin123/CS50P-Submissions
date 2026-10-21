@@ -73,29 +73,6 @@ function Save-CachedGitHubAuth {
     )
 }
 
-function Test-GitHubAuth {
-    param(
-        [Parameter(Mandatory)][string]$Username,
-        [Parameter(Mandatory)][string]$Token
-    )
-
-    try {
-        $response = Invoke-RestMethod `
-            -Uri "https://api.github.com/user" `
-            -Headers @{
-                "Accept" = "application/vnd.github+json"
-                "Authorization" = "Bearer $Token"
-                "X-GitHub-Api-Version" = "2022-11-28"
-                "User-Agent" = "CS50P-Launcher"
-            } `
-            -TimeoutSec 15
-        return $response.login -eq $Username
-    }
-    catch {
-        return $false
-    }
-}
-
 function Get-GitHubAuth {
     param(
         [Parameter(Mandatory)][string]$GitHubCli,
@@ -104,16 +81,24 @@ function Get-GitHubAuth {
 
     if (-not $ForceRefresh) {
         $cached = Read-CachedGitHubAuth
-        if ($cached -and (Test-GitHubAuth -Username $cached.username -Token $cached.token)) {
+        if ($cached) {
             return $cached
         }
     }
 
-    $accountOutput = & $GitHubCli api user --jq .login 2>$null
-    $tokenOutput = & $GitHubCli auth token 2>$null
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    try {
+        $accountOutput = & $GitHubCli api user --jq .login 2>$null
+        $tokenOutput = & $GitHubCli auth token 2>$null
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorAction
+    }
+
     if ($LASTEXITCODE -ne 0 -or -not $accountOutput -or -not $tokenOutput) {
         throw @"
-GitHub CLI is not currently authenticated.
+GitHub authentication is not available.
 
 Open PowerShell and run:
   gh auth login
@@ -125,9 +110,6 @@ Then double-click the CS50P desktop shortcut again.
     $auth = @{
         username = ([string]$accountOutput).Trim()
         token = ([string]$tokenOutput).Trim()
-    }
-    if (-not (Test-GitHubAuth -Username $auth.username -Token $auth.token)) {
-        throw "The GitHub token is invalid or has expired. Run: gh auth login"
     }
 
     Save-CachedGitHubAuth -Username $auth.username -Token $auth.token

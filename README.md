@@ -31,6 +31,8 @@
 - 官方提交仓库：`me50/moruxin123`
 
 GitHub 凭据只在启动时临时传给 WSL，不会写入仓库或脚本。
+启动器还会在 `%LOCALAPPDATA%\CS50P-Submissions` 保存一份由 Windows
+当前用户加密的凭据缓存，避免 `gh` 登录状态偶发读取失败时导致启动器退出。
 
 ## 目录结构
 

@@ -1,5 +1,6 @@
 param(
-    [switch]$SelfTest
+    [switch]$SelfTest,
+    [switch]$RefreshCredentials
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,6 +21,117 @@ function Find-GitHubCli {
     }
 
     throw "GitHub CLI was not found. Install it with: winget install GitHub.cli"
+}
+
+function Read-CachedGitHubAuth {
+    $cachePath = Join-Path $env:LOCALAPPDATA "CS50P-Submissions\github-auth.dat"
+    if (-not (Test-Path -LiteralPath $cachePath)) {
+        return $null
+    }
+
+    try {
+        Add-Type -AssemblyName System.Security
+        $encryptedBytes = [System.IO.File]::ReadAllBytes($cachePath)
+        $plainBytes = [System.Security.Cryptography.ProtectedData]::Unprotect(
+            $encryptedBytes,
+            $null,
+            [System.Security.Cryptography.DataProtectionScope]::CurrentUser
+        )
+        $json = [System.Text.Encoding]::UTF8.GetString($plainBytes)
+        $auth = $json | ConvertFrom-Json
+        if ($auth.username -and $auth.token) {
+            return $auth
+        }
+    }
+    catch {
+        return $null
+    }
+
+    return $null
+}
+
+function Save-CachedGitHubAuth {
+    param(
+        [Parameter(Mandatory)][string]$Username,
+        [Parameter(Mandatory)][string]$Token
+    )
+
+    Add-Type -AssemblyName System.Security
+    $cacheDirectory = Join-Path $env:LOCALAPPDATA "CS50P-Submissions"
+    New-Item -ItemType Directory -Path $cacheDirectory -Force | Out-Null
+
+    $payload = @{ username = $Username; token = $Token } | ConvertTo-Json -Compress
+    $plainBytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
+    $encryptedBytes = [System.Security.Cryptography.ProtectedData]::Protect(
+        $plainBytes,
+        $null,
+        [System.Security.Cryptography.DataProtectionScope]::CurrentUser
+    )
+    [System.IO.File]::WriteAllBytes(
+        (Join-Path $cacheDirectory "github-auth.dat"),
+        $encryptedBytes
+    )
+}
+
+function Test-GitHubAuth {
+    param(
+        [Parameter(Mandatory)][string]$Username,
+        [Parameter(Mandatory)][string]$Token
+    )
+
+    try {
+        $response = Invoke-RestMethod `
+            -Uri "https://api.github.com/user" `
+            -Headers @{
+                "Accept" = "application/vnd.github+json"
+                "Authorization" = "Bearer $Token"
+                "X-GitHub-Api-Version" = "2022-11-28"
+                "User-Agent" = "CS50P-Launcher"
+            } `
+            -TimeoutSec 15
+        return $response.login -eq $Username
+    }
+    catch {
+        return $false
+    }
+}
+
+function Get-GitHubAuth {
+    param(
+        [Parameter(Mandatory)][string]$GitHubCli,
+        [switch]$ForceRefresh
+    )
+
+    if (-not $ForceRefresh) {
+        $cached = Read-CachedGitHubAuth
+        if ($cached -and (Test-GitHubAuth -Username $cached.username -Token $cached.token)) {
+            return $cached
+        }
+    }
+
+    $accountOutput = & $GitHubCli api user --jq .login 2>$null
+    $tokenOutput = & $GitHubCli auth token 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $accountOutput -or -not $tokenOutput) {
+        throw @"
+GitHub CLI is not currently authenticated.
+
+Open PowerShell and run:
+  gh auth login
+
+Then double-click the CS50P desktop shortcut again.
+"@
+    }
+
+    $auth = @{
+        username = ([string]$accountOutput).Trim()
+        token = ([string]$tokenOutput).Trim()
+    }
+    if (-not (Test-GitHubAuth -Username $auth.username -Token $auth.token)) {
+        throw "The GitHub token is invalid or has expired. Run: gh auth login"
+    }
+
+    Save-CachedGitHubAuth -Username $auth.username -Token $auth.token
+    return [pscustomobject]$auth
 }
 
 function ConvertTo-WslPath {
@@ -71,15 +183,9 @@ $repoWindows = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $repoWsl = ConvertTo-WslPath $repoWindows
 $gh = Find-GitHubCli
 
-$account = (& $gh api user --jq .login).Trim()
-if ($LASTEXITCODE -ne 0 -or -not $account) {
-    throw "GitHub CLI is not authenticated. Run: gh auth login"
-}
-
-$token = (& $gh auth token).Trim()
-if ($LASTEXITCODE -ne 0 -or -not $token) {
-    throw "GitHub authentication token is unavailable. Run: gh auth login"
-}
+$auth = Get-GitHubAuth -GitHubCli $gh -ForceRefresh:$RefreshCredentials
+$account = $auth.username
+$token = $auth.token
 
 $oldUser = $env:CS50_GH_USER
 $oldToken = $env:CS50_TOKEN

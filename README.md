@@ -1,53 +1,60 @@
-# CS50P Problem Sets
+# CS50P 作业与提交中心
 
-This repository contains my solutions and submission history for
-[CS50's Introduction to Programming with Python](https://cs50.harvard.edu/python/).
+这是用于 [CS50's Introduction to Programming with Python](https://cs50.harvard.edu/python/)
+作业、检查和提交记录的仓库。
 
-## Repository layout
+## 一键使用
+
+双击桌面上的 **CS50P 作业中心**，或者双击仓库根目录的
+`START-HERE.cmd`。启动后可以：
+
+1. 选择题目
+2. 自动创建规范的作业目录
+3. 运行 `check50`
+4. 运行官方 `submit50`
+5. 在资源管理器中打开题目目录
+6. 保存并同步到 GitHub
+
+不需要手动打开 WSL、激活 Python 虚拟环境或输入课程 slug。Windows
+桌面快捷方式会自动完成这些步骤。
+
+## 环境说明
+
+`check50` 和 `submit50` 依赖 Unix 终端功能，因此运行在 Ubuntu WSL 中：
+
+- 发行版：`Ubuntu`
+- WSL 用户：`cs50p`
+- Python 环境：`/opt/cs50p-venv`
+- `check50`：3.5.0
+- `submit50`：3.2.1
+- 作业账号：`moruxin123`
+- 官方提交仓库：`me50/moruxin123`
+
+GitHub 凭据只在启动时临时传给 WSL，不会写入仓库或脚本。
+
+## 目录结构
+
+每道题有独立目录，文件名与 CS50P 规格一致：
 
 ```text
 problem_sets/
 ├── pset0/
+│   ├── indoor/
+│   │   └── indoor.py
+│   └── playback/
+│       └── playback.py
 ├── pset1/
-├── ...
-└── final_project/
+└── ...
 ```
 
-Each problem should live in its own folder. A typical problem set looks like:
+## 手动运行
 
-```text
-problem_sets/pset0/
-├── indoor/
-│   └── indoor.py
-└── playback/
-    └── playback.py
+平时使用桌面快捷方式即可。需要排查问题时，可以在 Ubuntu 中运行：
+
+```bash
+cd /mnt/c/Users/20332/Documents/Codex/2026-10-21/bang
+/usr/local/bin/check50 cs50/problems/2022/python/indoor
 ```
 
-## Before submitting
-
-Run the program locally and check that it uses only the libraries allowed by the
-problem specification.
-
-```powershell
-python solution.py
-```
-
-Run the course's automated checks from the folder containing the solution:
-
-```powershell
-check50 cs50/problems/2022/python/indoor
-```
-
-Submit the assignment with:
-
-```powershell
-submit50 cs50/problems/2022/python/indoor
-```
-
-Replace `indoor` with the slug for the current problem. Commit the working
-solution to Git before submitting.
-
-## Academic honesty
-
-The work in this repository is my own. Course starter code and specification
-materials remain subject to CS50's academic honesty policy.
+正式交卷前请再次阅读题目和 CS50 的学术诚信要求。仓库中的代码应为你本人
+完成的作品。

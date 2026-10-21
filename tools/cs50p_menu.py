@@ -165,6 +165,39 @@ def windows_path(path: Path) -> str:
     return resolved
 
 
+def find_vscode() -> Path | None:
+    candidates = [
+        Path("/mnt/c/Program Files/Microsoft VS Code/Code.exe"),
+        Path("/mnt/c/Program Files (x86)/Microsoft VS Code/Code.exe"),
+    ]
+    users_root = Path("/mnt/c/Users")
+    if users_root.exists():
+        candidates.extend(
+            users_root.glob("*/AppData/Local/Programs/Microsoft VS Code/Code.exe")
+        )
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def open_editor(directory: Path) -> None:
+    editor = find_vscode()
+    if editor is None:
+        print("找不到 VS Code。请运行：winget install Microsoft.VisualStudioCode")
+        return
+
+    python_files = sorted(directory.glob("*.py"))
+    target = python_files[0] if python_files else directory
+    subprocess.Popen(
+        [str(editor), "-n", windows_path(target)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    print(f"已用 VS Code 打开：{target}")
+
+
 def open_folder(directory: Path) -> None:
     explorer = shutil.which("explorer.exe")
     if not explorer:
@@ -353,24 +386,25 @@ def main_menu() -> None:
         print(" 1. 检查作业（check50）")
         print(" 2. 提交作业（submit50）")
         print(" 3. 运行作业程序")
-        print(" 4. 在文件资源管理器中打开作业目录")
-        print(" 5. 保存并同步到 GitHub")
-        print(" 6. 查看环境状态")
+        print(" 4. 编写作业代码（VS Code）")
+        print(" 5. 在文件资源管理器中打开作业目录")
+        print(" 6. 保存并同步到 GitHub")
+        print(" 7. 查看环境状态")
         print(" 0. 退出")
         choice = input("\n请选择操作：").strip()
 
         if choice == "0":
             return
-        if choice == "6":
+        if choice == "7":
             clear_screen()
             show_environment()
             pause()
             continue
-        if choice == "5":
+        if choice == "6":
             clear_screen()
             sync_github()
             continue
-        if choice not in {"1", "2", "3", "4"}:
+        if choice not in {"1", "2", "3", "4", "5"}:
             continue
 
         clear_screen()
@@ -384,6 +418,10 @@ def main_menu() -> None:
             submit_problem(problem)
         elif choice == "3":
             run_problem(problem)
+        elif choice == "4":
+            directory = selected_directory(problem)
+            open_editor(directory)
+            pause()
         else:
             directory = selected_directory(problem)
             print(f"已准备题目目录：{directory}")
